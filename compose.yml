@@ -2,11 +2,13 @@ services:
   nav:
     build: .
     container_name: nav-php
+    env_file:
+      - .env
     volumes:
       - ./index.php:/var/www/html/index.php
       - ./config.php:/var/www/html/config.php:ro
-      - /srv/docker/npmplus/data:/data:ro
-      - /home/falcon/GoogleDrive/Docs:/docs:ro
+      - ${NPM_DATA_PATH}:/data:ro
+      - ${GDOCS_PATH}:/docs:ro
     ports:
       - 8085:80
     restart: unless-stopped

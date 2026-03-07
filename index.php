@@ -187,6 +187,11 @@ if (empty($sites)) {
     $data_source = 'api';
 }
 
+// 按 ID 升序排列
+usort($sites, function($a, $b) {
+    return $a['id'] - $b['id'];
+});
+
 // 获取文档列表
 $docs_path = '/docs';
 $docs = getDocsList($docs_path);
@@ -240,6 +245,7 @@ $site_subtitle = '内部服务入口';
             transition: all 0.3s ease;
             text-decoration: none;
             display: block;
+            position: relative;
         }
         .card:hover {
             transform: translateY(-4px);
@@ -269,10 +275,12 @@ $site_subtitle = '内部服务入口';
             opacity: 0.7;
         }
         .card-id {
-            color: #ffd700;
-            font-size: 0.75rem;
-            margin-top: 4px;
-            font-family: monospace;
+            color: #64ffda;
+            font-size: 1rem;
+            font-weight: 600;
+            position: absolute;
+            top: 12px;
+            right: 16px;
         }
         footer {
             text-align: center;
@@ -331,11 +339,11 @@ $site_subtitle = '内部服务入口';
                 <?php else: ?>
                     <?php foreach ($sites as $site): ?>
                         <a href="https://<?= htmlspecialchars($site['domain']) ?>" class="card" target="_blank">
+                            <div class="card-id">#<?= htmlspecialchars($site['id']) ?></div>
                             <div class="card-icon">🌐</div>
                             <div class="card-title"><?= htmlspecialchars($site['name']) ?></div>
                             <div class="card-domain"><?= htmlspecialchars($site['domain']) ?></div>
                             <div class="card-url"><?= htmlspecialchars($site['url']) ?></div>
-                            <div class="card-id">ID: <?= htmlspecialchars($site['id']) ?></div>
                         </a>
                     <?php endforeach; ?>
                 <?php endif; ?>
