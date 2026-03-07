@@ -147,6 +147,35 @@ function getProxyHostsFromDb($db_path) {
     return $sites;
 }
 
+// 获取 Docs 目录下的 HTML 文件列表
+function getDocsList($docs_path) {
+    $docs = [];
+    
+    if (!is_dir($docs_path)) {
+        return $docs;
+    }
+    
+    $files = scandir($docs_path);
+    foreach ($files as $file) {
+        if (pathinfo($file, PATHINFO_EXTENSION) === 'html') {
+            $filepath = $docs_path . '/' . $file;
+            $stats = stat($filepath);
+            $docs[] = [
+                'name' => pathinfo($file, PATHINFO_FILENAME),
+                'filename' => $file,
+                'mtime' => $stats['mtime']
+            ];
+        }
+    }
+    
+    // 按修改时间倒序
+    usort($docs, function($a, $b) {
+        return $b['mtime'] - $a['mtime'];
+    });
+    
+    return $docs;
+}
+
 // 主逻辑：优先 API，失败则用数据库
 $db_path = '/data/npmplus/database.sqlite';
 $sites = getProxyHostsFromApi($config['api_url'], $config['email'], $config['password'], $cookie_jar);
@@ -157,6 +186,10 @@ if (empty($sites)) {
 } else {
     $data_source = 'api';
 }
+
+// 获取文档列表
+$docs_path = '/docs';
+$docs = getDocsList($docs_path);
 
 // 站点配置
 $site_title = '服务导航';
@@ -185,6 +218,13 @@ $site_subtitle = '内部服务入口';
             color: #fff;
             font-size: 2.5rem;
             margin-bottom: 10px;
+        }
+        h2 {
+            color: #fff;
+            font-size: 1.5rem;
+            margin: 40px 0 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
         }
         .subtitle { color: #8892b0; font-size: 1.1rem; }
         .grid {
@@ -244,6 +284,32 @@ $site_subtitle = '内部服务入口';
             color: #64ffda;
             font-size: 0.8rem;
         }
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+            justify-content: center;
+        }
+        .tab {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            color: #8892b0;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .tab:hover, .tab.active {
+            background: rgba(100,255,218,0.1);
+            border-color: #64ffda;
+            color: #64ffda;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
     </style>
 </head>
 <body>
@@ -253,25 +319,59 @@ $site_subtitle = '内部服务入口';
             <p class="subtitle"><?= htmlspecialchars($site_subtitle) ?></p>
         </header>
         
-        <div class="grid">
-            <?php if (empty($sites)): ?>
-                <p style="color:#8892b0;text-align:center;grid-column:1/-1;">暂无可用服务</p>
-            <?php else: ?>
-                <?php foreach ($sites as $site): ?>
-                    <a href="https://<?= htmlspecialchars($site['domain']) ?>" class="card" target="_blank">
-                        <div class="card-icon">🌐</div>
-                        <div class="card-title"><?= htmlspecialchars($site['name']) ?></div>
-                        <div class="card-domain"><?= htmlspecialchars($site['domain']) ?></div>
-                        <div class="card-url"><?= htmlspecialchars($site['url']) ?></div>
-                        <div class="card-id">ID: <?= htmlspecialchars($site['id']) ?></div>
-                    </a>
-                <?php endforeach; ?>
-            <?php endif; ?>
+        <div class="tabs">
+            <div class="tab active" onclick="switchTab('services')">🌐 服务</div>
+            <div class="tab" onclick="switchTab('docs')">📄 文档</div>
+        </div>
+        
+        <div id="services" class="tab-content active">
+            <div class="grid">
+                <?php if (empty($sites)): ?>
+                    <p style="color:#8892b0;text-align:center;grid-column:1/-1;">暂无可用服务</p>
+                <?php else: ?>
+                    <?php foreach ($sites as $site): ?>
+                        <a href="https://<?= htmlspecialchars($site['domain']) ?>" class="card" target="_blank">
+                            <div class="card-icon">🌐</div>
+                            <div class="card-title"><?= htmlspecialchars($site['name']) ?></div>
+                            <div class="card-domain"><?= htmlspecialchars($site['domain']) ?></div>
+                            <div class="card-url"><?= htmlspecialchars($site['url']) ?></div>
+                            <div class="card-id">ID: <?= htmlspecialchars($site['id']) ?></div>
+                        </a>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+            </div>
+        </div>
+        
+        <div id="docs" class="tab-content">
+            <div class="grid">
+                <?php if (empty($docs)): ?>
+                    <p style="color:#8892b0;text-align:center;grid-column:1/-1;">暂无可用文档</p>
+                <?php else: ?>
+                    <?php foreach ($docs as $doc): ?>
+                        <a href="/docs/<?= urlencode($doc['filename']) ?>" class="card" target="_blank">
+                            <div class="card-icon">📄</div>
+                            <div class="card-title"><?= htmlspecialchars($doc['name']) ?></div>
+                            <div class="card-domain"><?= htmlspecialchars($doc['filename']) ?></div>
+                            <div class="card-url"><?= date('Y-m-d', $doc['mtime']) ?></div>
+                        </a>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+            </div>
         </div>
         
         <footer>
             <p>Powered by NPMplus • 数据源: <span class="source"><?= htmlspecialchars($data_source) ?></span> • <?= date('Y-m-d H:i') ?></p>
         </footer>
     </div>
+    
+    <script>
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            
+            document.querySelector('.tab[onclick="switchTab(\'' + tabId + '\')"]').classList.add('active');
+            document.getElementById(tabId).classList.add('active');
+        }
+    </script>
 </body>
 </html>
