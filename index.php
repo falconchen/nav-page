@@ -368,9 +368,18 @@ $site_subtitle = '内部服务入口';
         </div>
         
         <footer>
-            <p>Powered by NPMplus • 数据源: <span class="source"><?= htmlspecialchars($data_source) ?></span> • <?= date('Y-m-d H:i') ?></p>
+            <p>Powered by NPMplus • 数据源: <span class="source"><?= htmlspecialchars($data_source) ?></span> • <span id="local-time"></span></p>
         </footer>
     </div>
+    
+    <script>
+        function updateTime() {
+            const now = new Date();
+            const options = { timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false };
+            document.getElementById('local-time').textContent = now.toLocaleString('zh-CN', options);
+        }
+        updateTime();
+    </script>
     
     <script>
         function switchTab(tabId) {
