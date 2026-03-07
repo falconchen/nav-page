@@ -1,0 +1,277 @@
+<?php
+/**
+ * NPMplus 导航页 - 动态读取代理域名
+ * 访问: https://nav.ubt.cellmean.com
+ * 
+ * 数据源：优先使用 NPMplus API，失败则回退到数据库
+ */
+
+// 加载配置
+require_once __DIR__ . '/config.php';
+
+$cookie_jar = '/tmp/npm_cookies.txt';
+
+// 尝试从 API 获取数据
+function getProxyHostsFromApi($api_url, $email, $password, $cookie_jar) {
+    $sites = [];
+    
+    // 登录获取 Cookie
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $api_url . '/api/tokens');
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode([
+        'identity' => $email,
+        'secret' => $password
+    ]));
+    curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    curl_setopt($ch, CURLOPT_COOKIEJAR, $cookie_jar);
+    curl_setopt($ch, CURLOPT_COOKIESESSION, true);
+    
+    $response = curl_exec($ch);
+    $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    
+    if ($http_code !== 200) {
+        return null; // 登录失败
+    }
+    
+    // 获取代理主机列表
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $api_url . '/api/nginx/proxy-hosts');
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    curl_setopt($ch, CURLOPT_COOKIEFILE, $cookie_jar);
+    
+    $response = curl_exec($ch);
+    $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    
+    if ($http_code !== 200) {
+        return null;
+    }
+    
+    $hosts = json_decode($response, true);
+    if (!is_array($hosts)) {
+        return null;
+    }
+    
+    foreach ($hosts as $host) {
+        if ($host['enabled'] !== true) {
+            continue; // 跳过禁用的主机
+        }
+        
+        $domains = $host['domain_names'] ?? [];
+        $primary_domain = $domains[0] ?? '';
+        
+        if (empty($primary_domain)) {
+            continue;
+        }
+        
+        $scheme = $host['forward_scheme'] ?? 'http';
+        $host_addr = $host['forward_host'] ?? '127.0.0.1';
+        $port = $host['forward_port'] ?? 80;
+        
+        // 构建 URL
+        $url = $scheme . '://' . $host_addr;
+        if (!in_array($port, [80, 443])) {
+            $url .= ':' . $port;
+        }
+        
+        // 从域名提取简短名称
+        $name = preg_replace('/\.ubt\.cellmean\.com$/', '', $primary_domain);
+        $name = ucfirst($name);
+        
+        $sites[] = [
+            'id' => $host['id'],
+            'name' => $name,
+            'domain' => $primary_domain,
+            'url' => $url
+        ];
+    }
+    
+    // 清理 Cookie
+    @unlink($cookie_jar);
+    
+    return $sites;
+}
+
+// 从数据库获取数据（回退方案）
+function getProxyHostsFromDb($db_path) {
+    $sites = [];
+    
+    try {
+        $pdo = new PDO("sqlite:$db_path");
+        $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        
+        $stmt = $pdo->query("
+            SELECT id, domain_names, forward_scheme, forward_host, forward_port 
+            FROM proxy_host 
+            WHERE is_deleted = 0 AND enabled = 1
+            ORDER BY domain_names
+        ");
+        
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $domains = json_decode($row['domain_names'], true);
+            $primary_domain = $domains[0] ?? '';
+            
+            if (empty($primary_domain)) {
+                continue;
+            }
+            
+            $scheme = $row['forward_scheme'];
+            $host = $row['forward_host'];
+            $port = $row['forward_port'];
+            
+            $url = $scheme . '://' . $host;
+            if (!in_array($port, [80, 443])) {
+                $url .= ':' . $port;
+            }
+            
+            $name = preg_replace('/\.ubt\.cellmean\.com$/', '', $primary_domain);
+            $name = ucfirst($name);
+            
+            $sites[] = [
+                'id' => $row['id'],
+                'name' => $name,
+                'domain' => $primary_domain,
+                'url' => $url
+            ];
+        }
+        
+    } catch (Exception $e) {
+        error_log("Database error: " . $e->getMessage());
+    }
+    
+    return $sites;
+}
+
+// 主逻辑：优先 API，失败则用数据库
+$db_path = '/data/npmplus/database.sqlite';
+$sites = getProxyHostsFromApi($config['api_url'], $config['email'], $config['password'], $cookie_jar);
+
+if (empty($sites)) {
+    $sites = getProxyHostsFromDb($db_path);
+    $data_source = 'database';
+} else {
+    $data_source = 'api';
+}
+
+// 站点配置
+$site_title = '服务导航';
+$site_subtitle = '内部服务入口';
+?>
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><?= htmlspecialchars($site_title) ?></title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            padding: 40px 20px;
+        }
+        .container { max-width: 900px; margin: 0 auto; }
+        header {
+            text-align: center;
+            margin-bottom: 50px;
+        }
+        h1 {
+            color: #fff;
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+        .subtitle { color: #8892b0; font-size: 1.1rem; }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+            gap: 20px;
+        }
+        .card {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 12px;
+            padding: 24px;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: block;
+        }
+        .card:hover {
+            transform: translateY(-4px);
+            background: rgba(255,255,255,0.1);
+            border-color: #64ffda;
+            box-shadow: 0 8px 32px rgba(100,255,218,0.15);
+        }
+        .card-icon {
+            font-size: 2rem;
+            margin-bottom: 12px;
+        }
+        .card-title {
+            color: #fff;
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+        .card-domain {
+            color: #64ffda;
+            font-size: 0.9rem;
+            word-break: break-all;
+        }
+        .card-url {
+            color: #8892b0;
+            font-size: 0.85rem;
+            margin-top: 8px;
+            opacity: 0.7;
+        }
+        .card-id {
+            color: #ffd700;
+            font-size: 0.75rem;
+            margin-top: 4px;
+            font-family: monospace;
+        }
+        footer {
+            text-align: center;
+            margin-top: 60px;
+            color: #8892b0;
+            font-size: 0.9rem;
+        }
+        .source {
+            color: #64ffda;
+            font-size: 0.8rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><?= htmlspecialchars($site_title) ?></h1>
+            <p class="subtitle"><?= htmlspecialchars($site_subtitle) ?></p>
+        </header>
+        
+        <div class="grid">
+            <?php if (empty($sites)): ?>
+                <p style="color:#8892b0;text-align:center;grid-column:1/-1;">暂无可用服务</p>
+            <?php else: ?>
+                <?php foreach ($sites as $site): ?>
+                    <a href="https://<?= htmlspecialchars($site['domain']) ?>" class="card" target="_blank">
+                        <div class="card-icon">🌐</div>
+                        <div class="card-title"><?= htmlspecialchars($site['name']) ?></div>
+                        <div class="card-domain"><?= htmlspecialchars($site['domain']) ?></div>
+                        <div class="card-url"><?= htmlspecialchars($site['url']) ?></div>
+                        <div class="card-id">ID: <?= htmlspecialchars($site['id']) ?></div>
+                    </a>
+                <?php endforeach; ?>
+            <?php endif; ?>
+        </div>
+        
+        <footer>
+            <p>Powered by NPMplus • 数据源: <span class="source"><?= htmlspecialchars($data_source) ?></span> • <?= date('Y-m-d H:i') ?></p>
+        </footer>
+    </div>
+</body>
+</html>

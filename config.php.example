@@ -1,0 +1,12 @@
+<?php
+/**
+ * NPMplus API 配置模板
+ * 复制此文件为 config.php 并填入真实配置
+ */
+
+// NPMplus 配置
+$config = [
+    'api_url' => 'https://npm.ubt.cellmean.com',
+    'email' => 'your-email@example.com',
+    'password' => 'your-password',
+];

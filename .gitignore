@@ -1,0 +1,15 @@
+# 敏感配置
+config.php
+
+# 临时文件
+*.tmp
+*.log
+
+# Cookie 文件
+/tmp/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo

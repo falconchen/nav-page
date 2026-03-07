@@ -1,0 +1,10 @@
+services:
+  nav:
+    image: php:8.3-apache
+    container_name: nav-php
+    volumes:
+      - ./index.php:/var/www/html/index.php
+      - /srv/docker/npmplus/data:/data:ro   # 挂载 NPMplus 数据目录
+    ports:
+      - 8085:80
+    restart: unless-stopped
