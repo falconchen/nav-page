@@ -615,6 +615,7 @@ $site_subtitle = '内部服务入口';
         }
 
         async function doRestart() {
+            if (!confirm('确认重启 openclaw-gateway 服务？')) return;
             const btn = document.getElementById('restart-btn');
             const result = document.getElementById('restart-result');
 
