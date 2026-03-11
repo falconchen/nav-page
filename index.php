@@ -97,6 +97,62 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'logs'
     exit;
 }
 
+// 通用 webhook 代理函数
+function webhook_proxy(string $path, string $post_body = '', array $extra_headers = []): array {
+    $token       = getenv('RESTART_TOKEN');
+    $webhook_url = getenv('WEBHOOK_URL');
+    if (empty($token) || empty($webhook_url)) {
+        return ['ok' => false, 'msg' => 'webhook not configured'];
+    }
+    $url = preg_replace('/\/[^\/]+$/', '/' . ltrim($path, '/'), $webhook_url);
+    $headers = array_merge(['X-Token: ' . $token], $extra_headers);
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $post_body);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+    $body      = curl_exec($ch);
+    $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curl_err  = curl_error($ch);
+    curl_close($ch);
+    if ($curl_err) {
+        return ['ok' => false, 'msg' => 'webhook unreachable: ' . $curl_err];
+    }
+    $result = json_decode($body, true);
+    if (!is_array($result)) {
+        return ['ok' => false, 'msg' => 'invalid webhook response (HTTP ' . $http_code . ')'];
+    }
+    return $result;
+}
+
+// 备份列表 action
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'backups') {
+    header('Content-Type: application/json');
+    $token = getenv('RESTART_TOKEN');
+    if (!hash_equals($token ?: '', $_POST['token'] ?? '')) {
+        http_response_code(403); echo json_encode(['ok' => false, 'files' => [], 'msg' => 'invalid token']); exit;
+    }
+    echo json_encode(webhook_proxy('backups'));
+    exit;
+}
+
+// 还原 action
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'restore') {
+    header('Content-Type: application/json');
+    $token = getenv('RESTART_TOKEN');
+    if (!hash_equals($token ?: '', $_POST['token'] ?? '')) {
+        http_response_code(403); echo json_encode(['ok' => false, 'msg' => 'invalid token']); exit;
+    }
+    $filename = $_POST['filename'] ?? '';
+    if (empty($filename)) {
+        echo json_encode(['ok' => false, 'msg' => 'missing filename']); exit;
+    }
+    $body = json_encode(['filename' => $filename]);
+    echo json_encode(webhook_proxy('restore', $body, ['Content-Type: application/json']));
+    exit;
+}
+
 // 加载配置
 require_once __DIR__ . '/config.php';
 
@@ -516,6 +572,29 @@ $site_subtitle = '内部服务入口';
                         word-break:break-all;
                     ">加载中…</pre>
                 </div>
+            </div>
+
+            <div style="max-width:600px;margin:20px auto 0;">
+                <div style="
+                    background:rgba(255,255,255,0.05);
+                    border:1px solid rgba(255,255,255,0.1);
+                    border-radius:12px;
+                    padding:28px 24px;
+                ">
+                    <div style="color:#ccd6f6;margin-bottom:4px;font-size:1.05rem;font-weight:600;">配置备份还原</div>
+                    <div style="color:#8892b0;font-size:0.9rem;margin-bottom:20px;">选择备份文件还原后自动重启服务，还原前会自动保存当前配置为 .bak</div>
+                    <button onclick="loadBackups()" style="
+                        background:rgba(255,255,255,0.05);
+                        border:1px solid rgba(255,255,255,0.2);
+                        color:#8892b0;
+                        padding:8px 18px;
+                        border-radius:8px;
+                        cursor:pointer;
+                        font-size:0.9rem;
+                        margin-bottom:16px;
+                    ">刷新备份列表</button>
+                    <div id="backup-list"></div>
+                    <div id="restore-result" style="margin-top:12px;font-size:0.95rem;display:none;"></div>
                 </div>
             </div>
         </div>
@@ -618,6 +697,79 @@ $site_subtitle = '内部服务入口';
                 }
             } catch (e) {
                 output.textContent = '请求失败: ' + e.message;
+            }
+        }
+
+        async function loadBackups() {
+            const list = document.getElementById('backup-list');
+            list.innerHTML = '<span style="color:#8892b0;font-size:0.9rem;">加载中…</span>';
+            try {
+                const fd = new FormData();
+                fd.append('action', 'backups');
+                fd.append('token', '<?= htmlspecialchars(getenv('RESTART_TOKEN') ?: '', ENT_QUOTES) ?>');
+                const resp = await fetch(window.location.pathname, { method: 'POST', body: fd });
+                const data = await resp.json();
+                if (!data.ok || !Array.isArray(data.files)) {
+                    list.innerHTML = '<span style="color:#ff6b6b;">' + (data.msg || '获取失败') + '</span>';
+                    return;
+                }
+                if (data.files.length === 0) {
+                    list.innerHTML = '<span style="color:#8892b0;font-size:0.9rem;">无备份文件</span>';
+                    return;
+                }
+                list.innerHTML = '';
+                data.files.forEach(f => {
+                    const dt = new Date(f.mtime * 1000).toLocaleString('zh-CN', {timeZone:'Asia/Shanghai'});
+                    const kb = (f.size / 1024).toFixed(1) + ' KB';
+                    const row = document.createElement('div');
+                    row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.06);gap:12px;';
+                    row.innerHTML = `
+                        <div style="flex:1;min-width:0;">
+                            <div style="color:#ccd6f6;font-size:0.88rem;word-break:break-all;">${f.name}</div>
+                            <div style="color:#8892b0;font-size:0.78rem;margin-top:2px;">${dt} &nbsp;·&nbsp; ${kb}</div>
+                        </div>
+                        <button onclick="doRestore('${f.name.replace(/'/g, "\\'")}')" style="
+                            flex-shrink:0;
+                            background:rgba(255,184,0,0.1);
+                            border:1px solid #ffb800;
+                            color:#ffb800;
+                            padding:6px 14px;
+                            border-radius:6px;
+                            cursor:pointer;
+                            font-size:0.85rem;
+                            white-space:nowrap;
+                        ">还原并重启</button>`;
+                    list.appendChild(row);
+                });
+            } catch (e) {
+                list.innerHTML = '<span style="color:#ff6b6b;">请求失败: ' + e.message + '</span>';
+            }
+        }
+
+        async function doRestore(filename) {
+            if (!confirm(`确认还原配置文件：\n${filename}\n\n当前配置将自动备份为 openclaw.json.bak，然后重启服务。`)) return;
+            const result = document.getElementById('restore-result');
+            result.style.display = 'none';
+            try {
+                const fd = new FormData();
+                fd.append('action', 'restore');
+                fd.append('token', '<?= htmlspecialchars(getenv('RESTART_TOKEN') ?: '', ENT_QUOTES) ?>');
+                fd.append('filename', filename);
+                const resp = await fetch(window.location.pathname, { method: 'POST', body: fd });
+                const data = await resp.json();
+                result.style.display = 'block';
+                if (data.ok) {
+                    result.style.color = '#64ffda';
+                    result.textContent = '✓ ' + (data.msg || '还原成功');
+                    loadBackups();
+                } else {
+                    result.style.color = '#ff6b6b';
+                    result.textContent = '✗ ' + (data.msg || '还原失败');
+                }
+            } catch (e) {
+                result.style.display = 'block';
+                result.style.color = '#ff6b6b';
+                result.textContent = '✗ 请求失败: ' + e.message;
             }
         }
     </script>
