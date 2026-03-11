@@ -2,9 +2,100 @@
 /**
  * NPMplus 导航页 - 动态读取代理域名
  * 访问: https://nav.ubt.cellmean.com
- * 
+ *
  * 数据源：优先使用 NPMplus API，失败则回退到数据库
  */
+
+// 处理重启 action（AJAX 接口）
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'restart') {
+    header('Content-Type: application/json');
+
+    $restart_token = getenv('RESTART_TOKEN');
+    $webhook_url   = getenv('WEBHOOK_URL');
+
+    if (empty($restart_token) || empty($webhook_url)) {
+        echo json_encode(['ok' => false, 'msg' => 'webhook not configured']);
+        exit;
+    }
+
+    $submitted_token = $_POST['token'] ?? '';
+    if (!hash_equals($restart_token, $submitted_token)) {
+        http_response_code(403);
+        echo json_encode(['ok' => false, 'msg' => 'invalid token']);
+        exit;
+    }
+
+    $ch = curl_init($webhook_url);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, '');
+    curl_setopt($ch, CURLOPT_HTTPHEADER, ['X-Token: ' . $restart_token]);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+    $body = curl_exec($ch);
+    $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curl_err  = curl_error($ch);
+    curl_close($ch);
+
+    if ($curl_err) {
+        echo json_encode(['ok' => false, 'msg' => 'webhook unreachable: ' . $curl_err]);
+        exit;
+    }
+
+    $result = json_decode($body, true);
+    if (!is_array($result)) {
+        echo json_encode(['ok' => false, 'msg' => 'invalid webhook response (HTTP ' . $http_code . ')']);
+        exit;
+    }
+
+    echo json_encode($result);
+    exit;
+}
+
+// 处理日志 action（AJAX 接口）
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'logs') {
+    header('Content-Type: application/json');
+
+    $restart_token = getenv('RESTART_TOKEN');
+    $webhook_url   = getenv('WEBHOOK_URL');
+
+    if (empty($restart_token) || empty($webhook_url)) {
+        echo json_encode(['ok' => false, 'lines' => [], 'msg' => 'webhook not configured']);
+        exit;
+    }
+
+    $submitted_token = $_POST['token'] ?? '';
+    if (!hash_equals($restart_token, $submitted_token)) {
+        http_response_code(403);
+        echo json_encode(['ok' => false, 'lines' => [], 'msg' => 'invalid token']);
+        exit;
+    }
+
+    $logs_url = preg_replace('/\/[^\/]+$/', '/logs', $webhook_url);
+    $ch = curl_init($logs_url);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, '');
+    curl_setopt($ch, CURLOPT_HTTPHEADER, ['X-Token: ' . $restart_token]);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+    $body = curl_exec($ch);
+    $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curl_err  = curl_error($ch);
+    curl_close($ch);
+
+    if ($curl_err) {
+        echo json_encode(['ok' => false, 'lines' => [], 'msg' => 'webhook unreachable: ' . $curl_err]);
+        exit;
+    }
+
+    $result = json_decode($body, true);
+    if (!is_array($result)) {
+        echo json_encode(['ok' => false, 'lines' => [], 'msg' => 'invalid webhook response (HTTP ' . $http_code . ')']);
+        exit;
+    }
+
+    echo json_encode($result);
+    exit;
+}
 
 // 加载配置
 require_once __DIR__ . '/config.php';
@@ -330,6 +421,7 @@ $site_subtitle = '内部服务入口';
         <div class="tabs">
             <div class="tab active" onclick="switchTab('services')">🌐 服务</div>
             <div class="tab" onclick="switchTab('docs')">📄 文档</div>
+            <div class="tab" onclick="switchTab('admin')">🔧 管理</div>
         </div>
         
         <div id="services" class="tab-content active">
@@ -366,7 +458,68 @@ $site_subtitle = '内部服务入口';
                 <?php endif; ?>
             </div>
         </div>
-        
+
+        <div id="admin" class="tab-content">
+            <div style="max-width:480px;margin:0 auto;">
+                <h2 style="margin-top:0;">服务管理</h2>
+                <div style="
+                    background:rgba(255,255,255,0.05);
+                    border:1px solid rgba(255,255,255,0.1);
+                    border-radius:12px;
+                    padding:28px 24px;
+                ">
+                    <div style="color:#ccd6f6;margin-bottom:8px;font-size:1.05rem;font-weight:600;">openclaw-gateway</div>
+                    <div style="color:#8892b0;font-size:0.9rem;margin-bottom:20px;">宿主机 systemd 服务</div>
+                    <button id="restart-btn" onclick="doRestart()" style="
+                        background:rgba(100,255,218,0.12);
+                        border:1px solid #64ffda;
+                        color:#64ffda;
+                        padding:10px 24px;
+                        border-radius:8px;
+                        cursor:pointer;
+                        font-size:1rem;
+                        transition:all 0.2s;
+                    ">重启服务</button>
+                    <button id="logs-btn" onclick="toggleLogs()" style="
+                        background:rgba(255,255,255,0.05);
+                        border:1px solid rgba(255,255,255,0.2);
+                        color:#8892b0;
+                        padding:10px 24px;
+                        border-radius:8px;
+                        cursor:pointer;
+                        font-size:1rem;
+                        margin-left:10px;
+                        transition:all 0.2s;
+                    ">查看日志</button>
+                    <div id="restart-result" style="margin-top:16px;font-size:0.95rem;display:none;"></div>
+                </div>
+                <div id="log-panel" style="display:none;margin-top:16px;">
+                    <div style="
+                        display:flex;align-items:center;justify-content:space-between;
+                        margin-bottom:8px;
+                    ">
+                        <span style="color:#8892b0;font-size:0.85rem;">最近 100 行 · 每 3 秒刷新</span>
+                        <span id="log-status" style="color:#64ffda;font-size:0.8rem;"></span>
+                    </div>
+                    <pre id="log-output" style="
+                        background:#0d1117;
+                        border:1px solid rgba(255,255,255,0.1);
+                        border-radius:8px;
+                        padding:16px;
+                        color:#c9d1d9;
+                        font-size:0.78rem;
+                        line-height:1.5;
+                        overflow-x:auto;
+                        overflow-y:auto;
+                        max-height:480px;
+                        white-space:pre-wrap;
+                        word-break:break-all;
+                    ">加载中…</pre>
+                </div>
+                </div>
+            </div>
+        </div>
+
         <footer>
             <p>Powered by NPMplus • 数据源: <span class="source"><?= htmlspecialchars($data_source) ?></span> • <span id="local-time"></span></p>
         </footer>
@@ -385,9 +538,87 @@ $site_subtitle = '内部服务入口';
         function switchTab(tabId) {
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
             document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-            
+
             document.querySelector('.tab[onclick="switchTab(\'' + tabId + '\')"]').classList.add('active');
             document.getElementById(tabId).classList.add('active');
+        }
+
+        async function doRestart() {
+            const btn = document.getElementById('restart-btn');
+            const result = document.getElementById('restart-result');
+
+            btn.disabled = true;
+            btn.textContent = '重启中…';
+            result.style.display = 'none';
+
+            try {
+                const fd = new FormData();
+                fd.append('action', 'restart');
+                fd.append('token', '<?= htmlspecialchars(getenv('RESTART_TOKEN') ?: '', ENT_QUOTES) ?>');
+
+                const resp = await fetch(window.location.pathname, { method: 'POST', body: fd });
+                const data = await resp.json();
+
+                result.style.display = 'block';
+                if (data.ok) {
+                    result.style.color = '#64ffda';
+                    result.textContent = '✓ ' + (data.msg || '重启成功');
+                } else {
+                    result.style.color = '#ff6b6b';
+                    result.textContent = '✗ ' + (data.msg || '重启失败');
+                }
+            } catch (e) {
+                result.style.display = 'block';
+                result.style.color = '#ff6b6b';
+                result.textContent = '✗ 请求失败: ' + e.message;
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '重启服务';
+            }
+        }
+
+        let _logTimer = null;
+
+        function toggleLogs() {
+            const panel = document.getElementById('log-panel');
+            const btn   = document.getElementById('logs-btn');
+            if (panel.style.display === 'none') {
+                panel.style.display = 'block';
+                btn.style.borderColor = '#64ffda';
+                btn.style.color = '#64ffda';
+                btn.textContent = '关闭日志';
+                fetchLogs();
+                _logTimer = setInterval(fetchLogs, 3000);
+            } else {
+                panel.style.display = 'none';
+                btn.style.borderColor = 'rgba(255,255,255,0.2)';
+                btn.style.color = '#8892b0';
+                btn.textContent = '查看日志';
+                clearInterval(_logTimer);
+                _logTimer = null;
+            }
+        }
+
+        async function fetchLogs() {
+            const status = document.getElementById('log-status');
+            const output = document.getElementById('log-output');
+            try {
+                const fd = new FormData();
+                fd.append('action', 'logs');
+                fd.append('token', '<?= htmlspecialchars(getenv('RESTART_TOKEN') ?: '', ENT_QUOTES) ?>');
+                const resp = await fetch(window.location.pathname, { method: 'POST', body: fd });
+                const data = await resp.json();
+                if (data.ok && Array.isArray(data.lines)) {
+                    output.textContent = data.lines.join('\n');
+                    output.scrollTop = output.scrollHeight;
+                    const now = new Date().toLocaleTimeString('zh-CN', {timeZone:'Asia/Shanghai'});
+                    status.textContent = '已更新 ' + now;
+                } else {
+                    output.textContent = data.msg || '获取日志失败';
+                }
+            } catch (e) {
+                output.textContent = '请求失败: ' + e.message;
+            }
         }
     </script>
 </body>

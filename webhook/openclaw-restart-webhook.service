@@ -1,0 +1,14 @@
+[Unit]
+Description=Openclaw Gateway Restart Webhook
+After=network.target
+
+[Service]
+Type=simple
+User=falcon
+ExecStart=/usr/bin/python3 /srv/docker/nav/webhook/restart_webhook.py
+EnvironmentFile=/srv/docker/nav/.env
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
