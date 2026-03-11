@@ -516,7 +516,7 @@ $site_subtitle = '内部服务入口';
         </div>
 
         <div id="admin" class="tab-content">
-            <div style="max-width:480px;margin:0 auto;">
+            <div style="max-width:600px;margin:0 auto;">
                 <h2 style="margin-top:0;">服务管理</h2>
                 <div style="
                     background:rgba(255,255,255,0.05);
@@ -524,77 +524,69 @@ $site_subtitle = '内部服务入口';
                     border-radius:12px;
                     padding:28px 24px;
                 ">
-                    <div style="color:#ccd6f6;margin-bottom:8px;font-size:1.05rem;font-weight:600;">openclaw-gateway</div>
+                    <div style="color:#ccd6f6;margin-bottom:4px;font-size:1.05rem;font-weight:600;">openclaw-gateway</div>
                     <div style="color:#8892b0;font-size:0.9rem;margin-bottom:20px;">宿主机 systemd 服务</div>
-                    <button id="restart-btn" onclick="doRestart()" style="
-                        background:rgba(100,255,218,0.12);
-                        border:1px solid #64ffda;
-                        color:#64ffda;
-                        padding:10px 24px;
-                        border-radius:8px;
-                        cursor:pointer;
-                        font-size:1rem;
-                        transition:all 0.2s;
-                    ">重启服务</button>
-                    <button id="logs-btn" onclick="toggleLogs()" style="
-                        background:rgba(255,255,255,0.05);
-                        border:1px solid rgba(255,255,255,0.2);
-                        color:#8892b0;
-                        padding:10px 24px;
-                        border-radius:8px;
-                        cursor:pointer;
-                        font-size:1rem;
-                        margin-left:10px;
-                        transition:all 0.2s;
-                    ">查看日志</button>
-                    <div id="restart-result" style="margin-top:16px;font-size:0.95rem;display:none;"></div>
-                </div>
-                <div id="log-panel" style="display:none;margin-top:16px;">
-                    <div style="
-                        display:flex;align-items:center;justify-content:space-between;
-                        margin-bottom:8px;
-                    ">
-                        <span style="color:#8892b0;font-size:0.85rem;">最近 <?= (int)(getenv('LOG_LINES') ?: 50) ?> 行 · 每 3 秒刷新</span>
-                        <span id="log-status" style="color:#64ffda;font-size:0.8rem;"></span>
+                    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+                        <button id="restart-btn" onclick="doRestart()" style="
+                            background:rgba(100,255,218,0.12);
+                            border:1px solid #64ffda;
+                            color:#64ffda;
+                            padding:10px 20px;
+                            border-radius:8px;
+                            cursor:pointer;
+                            font-size:0.95rem;
+                            transition:all 0.2s;
+                        ">重启服务</button>
+                        <button id="logs-btn" onclick="toggleLogs()" style="
+                            background:rgba(255,255,255,0.05);
+                            border:1px solid rgba(255,255,255,0.2);
+                            color:#8892b0;
+                            padding:10px 20px;
+                            border-radius:8px;
+                            cursor:pointer;
+                            font-size:0.95rem;
+                            transition:all 0.2s;
+                        ">查看日志</button>
+                        <button id="backups-btn" onclick="toggleBackups()" style="
+                            background:rgba(255,255,255,0.05);
+                            border:1px solid rgba(255,255,255,0.2);
+                            color:#8892b0;
+                            padding:10px 20px;
+                            border-radius:8px;
+                            cursor:pointer;
+                            font-size:0.95rem;
+                            transition:all 0.2s;
+                        ">配置备份还原</button>
                     </div>
-                    <pre id="log-output" style="
-                        background:#0d1117;
-                        border:1px solid rgba(255,255,255,0.1);
-                        border-radius:8px;
-                        padding:16px;
-                        color:#c9d1d9;
-                        font-size:0.78rem;
-                        line-height:1.5;
-                        overflow-x:auto;
-                        overflow-y:auto;
-                        max-height:480px;
-                        white-space:pre-wrap;
-                        word-break:break-all;
-                    ">加载中…</pre>
-                </div>
-            </div>
+                    <div id="restart-result" style="margin-top:16px;font-size:0.95rem;display:none;"></div>
 
-            <div style="max-width:600px;margin:20px auto 0;">
-                <div style="
-                    background:rgba(255,255,255,0.05);
-                    border:1px solid rgba(255,255,255,0.1);
-                    border-radius:12px;
-                    padding:28px 24px;
-                ">
-                    <div style="color:#ccd6f6;margin-bottom:4px;font-size:1.05rem;font-weight:600;">配置备份还原</div>
-                    <div style="color:#8892b0;font-size:0.9rem;margin-bottom:20px;">选择备份文件还原后自动重启服务，还原前会自动保存当前配置为 .bak</div>
-                    <button onclick="loadBackups()" style="
-                        background:rgba(255,255,255,0.05);
-                        border:1px solid rgba(255,255,255,0.2);
-                        color:#8892b0;
-                        padding:8px 18px;
-                        border-radius:8px;
-                        cursor:pointer;
-                        font-size:0.9rem;
-                        margin-bottom:16px;
-                    ">刷新备份列表</button>
-                    <div id="backup-list"></div>
-                    <div id="restore-result" style="margin-top:12px;font-size:0.95rem;display:none;"></div>
+                    <div id="log-panel" style="display:none;margin-top:20px;border-top:1px solid rgba(255,255,255,0.08);padding-top:16px;">
+                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+                            <span style="color:#8892b0;font-size:0.85rem;">最近 <?= (int)(getenv('LOG_LINES') ?: 50) ?> 行 · 每 3 秒刷新</span>
+                            <span id="log-status" style="color:#64ffda;font-size:0.8rem;"></span>
+                        </div>
+                        <pre id="log-output" style="
+                            background:#0d1117;
+                            border:1px solid rgba(255,255,255,0.1);
+                            border-radius:8px;
+                            padding:16px;
+                            color:#c9d1d9;
+                            font-size:0.78rem;
+                            line-height:1.5;
+                            overflow-x:auto;
+                            overflow-y:auto;
+                            max-height:400px;
+                            white-space:pre-wrap;
+                            word-break:break-all;
+                            margin:0;
+                        ">加载中…</pre>
+                    </div>
+
+                    <div id="backup-panel" style="display:none;margin-top:20px;border-top:1px solid rgba(255,255,255,0.08);padding-top:16px;">
+                        <div style="color:#8892b0;font-size:0.85rem;margin-bottom:12px;">选择备份文件还原后自动重启，还原前当前配置自动保存为 .bak</div>
+                        <div id="backup-list"><span style="color:#8892b0;font-size:0.9rem;">加载中…</span></div>
+                        <div id="restore-result" style="margin-top:12px;font-size:0.95rem;display:none;"></div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -675,6 +667,23 @@ $site_subtitle = '内部服务入口';
                 btn.textContent = '查看日志';
                 clearInterval(_logTimer);
                 _logTimer = null;
+            }
+        }
+
+        function toggleBackups() {
+            const panel = document.getElementById('backup-panel');
+            const btn   = document.getElementById('backups-btn');
+            if (panel.style.display === 'none') {
+                panel.style.display = 'block';
+                btn.style.borderColor = '#ffb800';
+                btn.style.color = '#ffb800';
+                btn.textContent = '关闭备份列表';
+                loadBackups();
+            } else {
+                panel.style.display = 'none';
+                btn.style.borderColor = 'rgba(255,255,255,0.2)';
+                btn.style.color = '#8892b0';
+                btn.textContent = '配置备份还原';
             }
         }
 
