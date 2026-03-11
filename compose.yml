@@ -5,7 +5,7 @@ services:
     env_file:
       - .env
     volumes:
-      - ./index.php:/var/www/html/index.php
+      - ./src:/var/www/html/
       - ./config.php:/var/www/html/config.php:ro
       - ${NPM_DATA_PATH}:/data:ro
       - ${GDOCS_PATH}:/docs:ro
