@@ -498,7 +498,7 @@ $site_subtitle = '内部服务入口';
                         display:flex;align-items:center;justify-content:space-between;
                         margin-bottom:8px;
                     ">
-                        <span style="color:#8892b0;font-size:0.85rem;">最近 100 行 · 每 3 秒刷新</span>
+                        <span style="color:#8892b0;font-size:0.85rem;">最近 <?= (int)(getenv('LOG_LINES') ?: 50) ?> 行 · 每 3 秒刷新</span>
                         <span id="log-status" style="color:#64ffda;font-size:0.8rem;"></span>
                     </div>
                     <pre id="log-output" style="

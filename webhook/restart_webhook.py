@@ -77,9 +77,11 @@ class WebhookHandler(http.server.BaseHTTPRequestHandler):
 
     def _handle_logs(self):
         try:
+            n = os.environ.get("LOG_LINES", "50")
+            n = str(int(n)) if n.isdigit() else "50"
             result = subprocess.run(
                 ["journalctl", "--user", "-u", "openclaw-gateway",
-                 "-n", "100", "--no-pager", "--output=short"],
+                 "-n", n, "--no-pager", "--output=short"],
                 capture_output=True,
                 text=True,
                 timeout=10,
