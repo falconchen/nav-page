@@ -477,6 +477,7 @@ $site_subtitle = '内部服务入口';
         <div class="tabs">
             <div class="tab active" onclick="switchTab('services')">🌐 服务</div>
             <div class="tab" onclick="switchTab('docs')">📄 文档</div>
+            <div class="tab" onclick="switchTab('browser-info')">🌍 信息</div>
             <div class="tab" onclick="switchTab('admin')">🔧 管理</div>
         </div>
         
@@ -512,6 +513,71 @@ $site_subtitle = '内部服务入口';
                         </a>
                     <?php endforeach; ?>
                 <?php endif; ?>
+            </div>
+        </div>
+
+        <div id="browser-info" class="tab-content">
+            <div style="max-width:700px;margin:0 auto;">
+                <div style="
+                    background:rgba(255,255,255,0.05);
+                    border:1px solid rgba(255,255,255,0.1);
+                    border-radius:12px;
+                    padding:28px 24px;
+                ">
+                    <h3 style="color:#fff;margin:0 0 20px;font-size:1.1rem;">🌍 浏览器与网络信息</h3>
+                    
+                    <div id="browser-info-loading" style="color:#8892b0;text-align:center;padding:20px;">
+                        加载中…
+                    </div>
+                    
+                    <div id="browser-info-content" style="display:none;">
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+                            <div style="background:rgba(0,0,0,0.2);border-radius:8px;padding:16px;">
+                                <div style="color:#8892b0;font-size:0.8rem;margin-bottom:6px;">IP 地址</div>
+                                <div id="info-ip" style="color:#64ffda;font-size:1.1rem;font-weight:600;">-</div>
+                            </div>
+                            <div style="background:rgba(0,0,0,0.2);border-radius:8px;padding:16px;">
+                                <div style="color:#8892b0;font-size:0.8rem;margin-bottom:6px;">IP 归属地</div>
+                                <div id="info-location" style="color:#fff;font-size:1rem;">-</div>
+                            </div>
+                            <div style="background:rgba(0,0,0,0.2);border-radius:8px;padding:16px;grid-column:1/-1;">
+                                <div style="color:#8892b0;font-size:0.8rem;margin-bottom:6px;">User Agent</div>
+                                <div id="info-ua" style="color:#ccd6f6;font-size:0.85rem;word-break:break-all;line-height:1.5;">-</div>
+                            </div>
+                            <div style="background:rgba(0,0,0,0.2);border-radius:8px;padding:16px;">
+                                <div style="color:#8892b0;font-size:0.8rem;margin-bottom:6px;">浏览器</div>
+                                <div id="info-browser" style="color:#fff;font-size:1rem;">-</div>
+                            </div>
+                            <div style="background:rgba(0,0,0,0.2);border-radius:8px;padding:16px;">
+                                <div style="color:#8892b0;font-size:0.8rem;margin-bottom:6px;">操作系统</div>
+                                <div id="info-os" style="color:#fff;font-size:1rem;">-</div>
+                            </div>
+                            <div style="background:rgba(0,0,0,0.2);border-radius:8px;padding:16px;">
+                                <div style="color:#8892b0;font-size:0.8rem;margin-bottom:6px;">屏幕分辨率</div>
+                                <div id="info-screen" style="color:#fff;font-size:1rem;">-</div>
+                            </div>
+                            <div style="background:rgba(0,0,0,0.2);border-radius:8px;padding:16px;">
+                                <div style="color:#8892b0;font-size:0.8rem;margin-bottom:6px;">语言</div>
+                                <div id="info-lang" style="color:#fff;font-size:1rem;">-</div>
+                            </div>
+                        </div>
+                        <div style="margin-top:20px;padding-top:16px;border-top:1px solid rgba(255,255,255,0.08);">
+                            <div style="color:#8892b0;font-size:0.8rem;margin-bottom:6px;">完整网络信息</div>
+                            <pre id="info-network" style="
+                                background:#0d1117;
+                                border:1px solid rgba(255,255,255,0.1);
+                                border-radius:8px;
+                                padding:12px;
+                                color:#c9d1d9;
+                                font-size:0.75rem;
+                                line-height:1.4;
+                                overflow-x:auto;
+                                margin:0;
+                                max-height:150px;
+                            ">-</pre>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -612,6 +678,84 @@ $site_subtitle = '内部服务入口';
 
             document.querySelector('.tab[onclick="switchTab(\'' + tabId + '\')"]').classList.add('active');
             document.getElementById(tabId).classList.add('active');
+            
+            if (tabId === 'browser-info' && document.getElementById('browser-info-content').style.display === 'none') {
+                loadBrowserInfo();
+            }
+        }
+        
+        let _browserInfoLoaded = false;
+        
+        async function loadBrowserInfo() {
+            if (_browserInfoLoaded) return;
+            _browserInfoLoaded = true;
+            
+            const loading = document.getElementById('browser-info-loading');
+            const content = document.getElementById('browser-info-content');
+            
+            try {
+                // 获取 IP 信息
+                const ipResp = await fetch('https://ipapi.co/json/');
+                const ipData = await ipResp.json();
+                
+                document.getElementById('info-ip').textContent = ipData.ip || '未知';
+                
+                let location = '-';
+                if (ipData.city) location += ipData.city + ' ';
+                if (ipData.region) location += ipData.region + ' ';
+                if (ipData.country_name) location += ipData.country_name;
+                document.getElementById('info-location').textContent = location === '- - -' ? '-' : location.trim();
+                
+                // UA 信息
+                const ua = navigator.userAgent;
+                document.getElementById('info-ua').textContent = ua;
+                
+                // 解析浏览器
+                let browser = '未知';
+                if (ua.includes('Firefox')) browser = 'Firefox';
+                else if (ua.includes('Edg/')) browser = 'Microsoft Edge';
+                else if (ua.includes('Chrome') && !ua.includes('Edg')) browser = 'Chrome';
+                else if (ua.includes('Safari') && !ua.includes('Chrome')) browser = 'Safari';
+                else if (ua.includes('OPR') || ua.includes('Opera')) browser = 'Opera';
+                document.getElementById('info-browser').textContent = browser;
+                
+                // 解析操作系统
+                let os = '未知';
+                if (ua.includes('Windows')) os = 'Windows';
+                else if (ua.includes('iPhone') || ua.includes('iPad')) os = 'iOS';
+                else if (ua.includes('Mac')) os = 'macOS';
+                else if (ua.includes('Linux')) os = 'Linux';
+                else if (ua.includes('Android')) os = 'Android';
+                document.getElementById('info-os').textContent = os;
+                
+                // 屏幕分辨率
+                document.getElementById('info-screen').textContent = screen.width + ' × ' + screen.height;
+                
+                // 语言
+                document.getElementById('info-lang').textContent = (navigator.language || navigator.userLanguage || '-');
+                
+                // 网络信息
+                let netInfo = 'Connection: ';
+                if (navigator.connection) {
+                    const c = navigator.connection;
+                    netInfo += 'effectiveType=' + (c.effectiveType || '-');
+                    netInfo += ', downlink=' + (c.downlink || '-') + 'Mbps';
+                    netInfo += ', rtt=' + (c.rtt || '-') + 'ms';
+                    netInfo += ', saveData=' + (c.saveData ? 'on' : 'off');
+                } else {
+                    netInfo += '不支持';
+                }
+                netInfo += '\nOnline: ' + navigator.onLine;
+                netInfo += '\nCookieEnabled: ' + navigator.cookieEnabled;
+                netInfo += '\nDoNotTrack: ' + (navigator.doNotTrack || '-');
+                document.getElementById('info-network').textContent = netInfo;
+                
+                loading.style.display = 'none';
+                content.style.display = 'block';
+                
+            } catch (e) {
+                loading.textContent = '加载失败: ' + e.message;
+            }
         }
 
         async function doRestart() {
