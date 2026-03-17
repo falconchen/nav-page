@@ -471,13 +471,13 @@ $site_subtitle = '内部服务入口';
         </header>
         
         <div class="tabs">
-            <div class="tab active" onclick="switchTab('services')">🌐 网站</div>
+            <div class="tab active" onclick="switchTab('websites')">🌐 网站</div>
             <div class="tab" onclick="switchTab('docs')">📄 文档</div>
             <div class="tab" onclick="switchTab('browser-info')">🌍 信息</div>
             <div class="tab" onclick="switchTab('admin')">🔧 管理</div>
         </div>
         
-        <div id="services" class="tab-content active">
+        <div id="websites" class="tab-content active">
             <div class="grid">
                 <?php if (empty($sites)): ?>
                     <p style="color:#8892b0;text-align:center;grid-column:1/-1;">暂无可用服务</p>
@@ -684,7 +684,7 @@ $site_subtitle = '内部服务入口';
         // 页面加载时读取 hash 切换 Tab
         (function() {
             const hash = window.location.hash.slice(1);
-            const validTabs = ['services', 'docs', 'browser-info', 'admin'];
+            const validTabs = ['websites', 'docs', 'browser-info', 'admin'];
             if (validTabs.includes(hash)) {
                 // 延迟一下确保 DOM 渲染完成
                 setTimeout(() => switchTab(hash), 0);
