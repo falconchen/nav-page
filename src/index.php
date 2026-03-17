@@ -400,10 +400,6 @@ $site_subtitle = '内部服务入口';
             border-color: #64ffda;
             box-shadow: 0 8px 32px rgba(100,255,218,0.15);
         }
-        .card-icon {
-            font-size: 2rem;
-            margin-bottom: 12px;
-        }
         .card-title {
             color: #fff;
             font-size: 1.25rem;
@@ -475,7 +471,7 @@ $site_subtitle = '内部服务入口';
         </header>
         
         <div class="tabs">
-            <div class="tab active" onclick="switchTab('services')">🌐 服务</div>
+            <div class="tab active" onclick="switchTab('services')">🌐 网站</div>
             <div class="tab" onclick="switchTab('docs')">📄 文档</div>
             <div class="tab" onclick="switchTab('browser-info')">🌍 信息</div>
             <div class="tab" onclick="switchTab('admin')">🔧 管理</div>
@@ -489,7 +485,6 @@ $site_subtitle = '内部服务入口';
                     <?php foreach ($sites as $site): ?>
                         <a href="https://<?= htmlspecialchars($site['domain']) ?>" class="card" target="_blank">
                             <div class="card-id">#<?= htmlspecialchars($site['id']) ?></div>
-                            <div class="card-icon">🌐</div>
                             <div class="card-title"><?= htmlspecialchars($site['name']) ?></div>
                             <div class="card-domain"><?= htmlspecialchars($site['domain']) ?></div>
                             <div class="card-url"><?= htmlspecialchars($site['url']) ?></div>
@@ -506,7 +501,6 @@ $site_subtitle = '内部服务入口';
                 <?php else: ?>
                     <?php foreach ($docs as $doc): ?>
                         <a href="/docs/<?= urlencode($doc['filename']) ?>" class="card" target="_blank">
-                            <div class="card-icon">📄</div>
                             <div class="card-title"><?= htmlspecialchars($doc['name']) ?></div>
                             <div class="card-domain"><?= htmlspecialchars($doc['filename']) ?></div>
                             <div class="card-url"><?= date('Y-m-d', $doc['mtime']) ?></div>
@@ -679,10 +673,23 @@ $site_subtitle = '内部服务入口';
             document.querySelector('.tab[onclick="switchTab(\'' + tabId + '\')"]').classList.add('active');
             document.getElementById(tabId).classList.add('active');
             
+            // 更新 URL hash
+            history.replaceState(null, '', '#' + tabId);
+            
             if (tabId === 'browser-info' && document.getElementById('browser-info-content').style.display === 'none') {
                 loadBrowserInfo();
             }
         }
+        
+        // 页面加载时读取 hash 切换 Tab
+        (function() {
+            const hash = window.location.hash.slice(1);
+            const validTabs = ['services', 'docs', 'browser-info', 'admin'];
+            if (validTabs.includes(hash)) {
+                // 延迟一下确保 DOM 渲染完成
+                setTimeout(() => switchTab(hash), 0);
+            }
+        })();
         
         let _browserInfoLoaded = false;
         
